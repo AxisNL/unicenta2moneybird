@@ -82,7 +82,9 @@ config.read('etc/unicenta2moneybird.conf')
 # ####################################
 uc.DownloadTickets()
 uc.DownloadTicketLines()
-#uc.TransformTickets()
+uc.DownloadReceipts()
+uc.DownloadPayments()
+uc.DownloadTaxes()
 
 # mb.DownloadContacts()
 # mb.DownloadFinancialAccounts()
