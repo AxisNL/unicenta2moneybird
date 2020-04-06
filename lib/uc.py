@@ -19,6 +19,7 @@ Unicenta_MySQL_db = config['Unicenta']['Unicenta_MySQL_db']
 
 ticketsfile = "var/unicenta_tickets.json"
 ticketlinesfile = "var/unicenta_ticketlines.json"
+receiptsfile = "var/unicenta_receipts.json"
 
 _DBConnection = None
 
@@ -37,7 +38,7 @@ def GetDBConnection():
 
 def DownloadTickets():
     mysql_query = 'SELECT * FROM tickets'
-    mycursor = GetDBConnection().cursor()
+    mycursor = GetDBConnection().cursor(dictionary=True)
     mycursor.execute(mysql_query)
     result = mycursor.fetchall()
     with open(ticketsfile, 'w') as outfile:
@@ -47,13 +48,23 @@ def DownloadTickets():
 
 def DownloadTicketLines():
     mysql_query = 'SELECT * FROM ticketlines'
-    mycursor = GetDBConnection().cursor()
+    mycursor = GetDBConnection().cursor(dictionary=True)
     mycursor.execute(mysql_query)
     result = mycursor.fetchall()
     with open(ticketlinesfile, 'w') as outfile:
         json.dump(result, outfile, indent=4, sort_keys=True)
     logging.info('Downloaded uniCenta ticketlines ({0} items)'.format(len(result)))
 
+
+
+def DownloadReceipts():
+    mysql_query = 'SELECT * FROM receipts'
+    mycursor = GetDBConnection().cursor(dictionary=True)
+    mycursor.execute(mysql_query)
+    result = mycursor.fetchall()
+    with open(receiptsfile, 'w') as outfile:
+        json.dump(result, outfile, indent=4, sort_keys=True)
+    logging.info('Downloaded uniCenta receipts ({0} items)'.format(len(result)))
 
 #
 # def DownloadTicketsRaw(datestart, dateend):
