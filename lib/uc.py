@@ -2,7 +2,7 @@ import configparser
 import logging
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, date
 import mysql.connector
 
 # from lib import log
@@ -20,6 +20,8 @@ Unicenta_MySQL_db = config['Unicenta']['Unicenta_MySQL_db']
 ticketsfile = "var/unicenta_tickets.json"
 ticketlinesfile = "var/unicenta_ticketlines.json"
 receiptsfile = "var/unicenta_receipts.json"
+paymentsfile = "var/unicenta_payments.json"
+taxesfile = "var/unicenta_taxes.json"
 
 _DBConnection = None
 
@@ -36,13 +38,20 @@ def GetDBConnection():
     return _DBConnection
 
 
+def json_serial(obj):
+    """JSON serializer for objects not serializable by default json code"""
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    raise TypeError ("Type %s not serializable" % type(obj))
+
+
 def DownloadTickets():
     mysql_query = 'SELECT * FROM tickets'
     mycursor = GetDBConnection().cursor(dictionary=True)
     mycursor.execute(mysql_query)
     result = mycursor.fetchall()
     with open(ticketsfile, 'w') as outfile:
-        json.dump(result, outfile, indent=4, sort_keys=True)
+        json.dump(result, outfile, indent=4, sort_keys=True, default=json_serial)
     logging.info('Downloaded uniCenta tickets ({0} items)'.format(len(result)))
 
 
@@ -52,9 +61,8 @@ def DownloadTicketLines():
     mycursor.execute(mysql_query)
     result = mycursor.fetchall()
     with open(ticketlinesfile, 'w') as outfile:
-        json.dump(result, outfile, indent=4, sort_keys=True)
+        json.dump(result, outfile, indent=4, sort_keys=True, default=json_serial)
     logging.info('Downloaded uniCenta ticketlines ({0} items)'.format(len(result)))
-
 
 
 def DownloadReceipts():
@@ -63,8 +71,28 @@ def DownloadReceipts():
     mycursor.execute(mysql_query)
     result = mycursor.fetchall()
     with open(receiptsfile, 'w') as outfile:
-        json.dump(result, outfile, indent=4, sort_keys=True)
+        json.dump(result, outfile, indent=4, sort_keys=True, default=json_serial)
     logging.info('Downloaded uniCenta receipts ({0} items)'.format(len(result)))
+
+
+def DownloadPayments():
+    mysql_query = 'SELECT * FROM payments'
+    mycursor = GetDBConnection().cursor(dictionary=True)
+    mycursor.execute(mysql_query)
+    result = mycursor.fetchall()
+    with open(paymentsfile, 'w') as outfile:
+        json.dump(result, outfile, indent=4, sort_keys=True, default=json_serial)
+    logging.info('Downloaded uniCenta payments ({0} items)'.format(len(result)))
+
+
+def DownloadTaxes():
+    mysql_query = 'SELECT * FROM taxes'
+    mycursor = GetDBConnection().cursor(dictionary=True)
+    mycursor.execute(mysql_query)
+    result = mycursor.fetchall()
+    with open(taxesfile, 'w') as outfile:
+        json.dump(result, outfile, indent=4, sort_keys=True, default=json_serial)
+    logging.info('Downloaded uniCenta payments ({0} items)'.format(len(result)))
 
 #
 # def DownloadTicketsRaw(datestart, dateend):
