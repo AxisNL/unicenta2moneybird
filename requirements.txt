@@ -1,0 +1,6 @@
+mysql-connector-python
+numpy
+python-dateutil
+argparse
+requests
+configparser
