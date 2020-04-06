@@ -30,7 +30,23 @@ def DownloadTickets(datestart, dateend):
     ucDate1 = datestart.strftime("%Y-%m-%d")
     ucDate2 = dateend.strftime("%Y-%m-%d")
 
-    mysql_query = 'SELECT ticketid as tickets_ticketid, r.datenew as receipts_datenew, p.name as product_name, payments.payment as payments_payment, tl.units as ticketlines_units,tl.price as ticketlines_price ,taxes.rate as taxes_rateFROM ticketlines tl left outer join tickets t on tl.ticket=t.idleft outer join products p on p.id=tl.productleft outer join receipts r on r.id=t.idleft outer join payments on r.id = payments.receiptleft join taxes on taxes.id = tl.taxidorder by ticketid'
+    mysql_query = ''
+
+    mysql_query += 'SELECT '
+    mysql_query += 'ticketid as tickets_ticketid, '
+    mysql_query += 'r.datenew as receipts_datenew,  '
+    mysql_query += 'p.name as product_name,  '
+    mysql_query += 'payments.payment as payments_payment,  '
+    mysql_query += 'tl.units as ticketlines_units,  '
+    mysql_query += 'tl.price as ticketlines_price,  '
+    mysql_query += 'taxes.rate as taxes_rate  '
+    mysql_query += 'FROM ticketlines tl  '
+    mysql_query += 'left outer join tickets t on tl.ticket=t.id '
+    mysql_query += 'left outer join products p on p.id=tl.product '
+    mysql_query += 'left outer join receipts r on r.id=t.id '
+    mysql_query += 'left outer join payments on r.id = payments.receipt '
+    mysql_query += 'left join taxes on taxes.id = tl.taxid '
+    mysql_query += 'order by ticketid '
 
     mycursor = mydb.cursor()
     mycursor.execute(mysql_query)
