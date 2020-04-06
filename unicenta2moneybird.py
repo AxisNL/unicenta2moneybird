@@ -50,7 +50,8 @@ config.read('etc/unicenta2moneybird.conf')
 
 # SET THE DEFAULT START AND END DATES
 date = datetime.datetime.today()
-startDate = (date + datetime.timedelta(days=(0-config['Global']['default_days_back'])))
+days_back_default = int(config['Global']['default_days_back'])
+startDate = (date + datetime.timedelta(days=(0 - days_back_default)))
 endDate = (date + datetime.timedelta(days=1))
 
 if args.startdatestring is not None:
