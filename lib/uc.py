@@ -138,6 +138,21 @@ def LookupTaxrate(categoryid):
 def validateCustomSale(sale):
     # validate the sale to see if it is valid (fully paid, etc)
 
+    # Payment method filter
+    filter_exists = config.has_option('Unicenta', 'Payment_method_filter')
+    if filter_exists:
+        payment_method_filter = str(config['Unicenta']['Payment_method_filter'])
+        payment_method_filter_items = []
+        for item in payment_method_filter.split(','):
+            payment_method_filter_items.append(item.strip())
+
+        for payment in sale['payments']:
+            if payment['method'] not in payment_method_filter_items:
+                logging.warning("Sale '{0}' has a payment method '{1}'. This is not allowed according to your "
+                                "configured filter '{2}'. Ignoring sale.".format(sale['reference'], payment['method'],
+                                                                                 payment_method_filter_items))
+                return False
+
     # get the total of all the products
     total_amount_products = 0
     for product in sale['products']:

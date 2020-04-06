@@ -266,18 +266,14 @@ def DownloadPurchaseInvoices(startdate, enddate):
     logging.info('Downloaded Moneybird purchase invoices ({0} items)'.format(len(purchaseinvoices)))
 
 
-def AddFinancialStatementAndMutation(reference, transactioncode, timestamp, amount_dec):
-    financial_account_id_izettle = LookupFinancialAccountId(config['Moneybird']['financial_account_izettle'])
-    if transactioncode == 'PAYOUT':
-        amount_dec = 0 - amount_dec
-    if transactioncode == 'CARD_PAYMENT_FEE':
-        amount_dec = 0 - amount_dec
+def AddFinancialStatementAndMutation(reference, timestamp, amount_dec):
+    financial_account_unicenta_cash = LookupFinancialAccountId(config['Moneybird']['financial_account_unicenta_cash'])
 
     statement = {
         "financial_statement":
             {
                 "reference": reference,
-                "financial_account_id": financial_account_id_izettle,
+                "financial_account_id": financial_account_unicenta_cash,
                 "financial_mutations_attributes":
                     {
                         "1": {
@@ -297,20 +293,6 @@ def AddFinancialStatementAndMutation(reference, transactioncode, timestamp, amou
         financial_mutation_id = statementpost['financial_mutations'][0]['id']
         logging.info("Created financial statement '{0}'".format(reference))
         return financial_mutation_id
-
-
-def LinkPayout(mutation_id, amount_dec):
-    grootboekrekening_id_kruisposten = LookupLedgerAccountId(config['Moneybird']['ledger_kruisposten'])
-
-    link = {
-        "booking_type": "LedgerAccount",
-        "booking_id": grootboekrekening_id_kruisposten,
-        "price_base": "{0:f}".format(amount_dec)
-    }
-    url = "https://moneybird.com/api/v2/{0}/financial_mutations/{1}/link_booking.json".format(administratie_id,
-                                                                                              mutation_id)
-    MakePatchRequest(url, link)
-    print("Linked payout to bank account")
 
 
 def LinkSalesInvoice(mutation_id, salesinvoice_id, amount_dec):
@@ -336,32 +318,20 @@ def MakePositive(number):
     return number
 
 
-def LinkPurchaseInvoice(mutation_id, purchaseinvoice_id, amount_dec):
-
-    link = {
-        "booking_type": "Document",
-        "booking_id": purchaseinvoice_id,
-        "price_base": "{0:f}".format(amount_dec)
-    }
-    url = "https://moneybird.com/api/v2/{0}/financial_mutations/{1}/link_booking.json".format(administratie_id,
-                                                                                              mutation_id)
-    MakePatchRequest(url, link)
-
-
 def AddSalesInvoice(reference, invoice_date, products):
     details_attributes = []
     for product in products:
         description = product['description']
         if len(description) == 0:
             description = "Diversen"
-        price = product['price']
         taxrateid = LookupTaxrateIdSales(product['tax_rate'])
         ladgeraccountid = LookupLedgerAccountId(config['Moneybird']['grootboekrekening_omzet'])
         details_attribute = {
             "description": description,
-            "price": "{0:f}".format(price),
+            "price": "{0:f}".format(product['price']),
             "tax_rate_id": taxrateid,
-            "ledger_account_id": ladgeraccountid
+            "ledger_account_id": ladgeraccountid,
+            "amount": product['amount']
         }
         details_attributes.append(details_attribute)
 
@@ -374,8 +344,7 @@ def AddSalesInvoice(reference, invoice_date, products):
                        }
                   }
     url = "https://moneybird.com/api/v2/{0}/sales_invoices".format(administratie_id)
-    print(json.dumps(postObject, sort_keys=True, indent=2))
-    exit(1)
+    #print(json.dumps(postObject, sort_keys=True, indent=2))
     invoicepost = MakePostRequest(url, postObject)
     invoiceid = invoicepost['id']
     return invoiceid
@@ -388,34 +357,6 @@ def SendInvoice(invoiceid):
                        }
                   }
     MakePatchRequest(url, postObject)
-
-
-def AddPurchaseInvoice(reference, invoice_date, prijs_incl_decimal):
-    contactid_izettle = LookupContactId(config['Moneybird']['contact_izettle'])
-    ledgerid_bankkosten = LookupLedgerAccountId(config['Moneybird']['ledger_bankkosten'])
-    taxrateid = LookupTaxrateIdPurchase(0)
-    postObject = {"purchase_invoice":
-                      {"reference": reference,
-                       "date": invoice_date.isoformat(),
-                       "contact_id": contactid_izettle,
-                       "details_attributes": [
-                           {
-                               "description": "Administratiekosten bij pintransactie",
-                               "price": "{0:f}".format(prijs_incl_decimal),
-                               "ledger_account_id": ledgerid_bankkosten,
-                               "tax_rate_id": taxrateid
-                           }
-                       ],
-                       "prices_are_incl_tax": True
-                       }
-                  }
-
-    if flagNoop:
-        logging.info("NOOP: Purchase invoice '{0}' should be created, but in read-only mode".format(reference))
-    else:
-        url = "https://moneybird.com/api/v2/{0}/documents/purchase_invoices.json".format(administratie_id)
-        MakePostRequest(url, postObject)
-        logging.info("Purchase invoice '{0}' created".format(reference))
 
 
 def MakeGetRequest(url):

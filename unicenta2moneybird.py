@@ -1,7 +1,9 @@
 import configparser
+import decimal
 import sys
 import datetime
 import argparse
+
 from lib import uc, mb, log
 
 parser = argparse.ArgumentParser(description='Sync iZettle to your Moneybird account.')
@@ -37,12 +39,18 @@ if sys.version_info <= (3, 6, 0):
     exit(1)
 
 ######################################
+# GET THE PARAMETERS FROM THE CONFIG FILE
+# ####################################
+config = configparser.ConfigParser()
+config.read('etc/unicenta2moneybird.conf')
+
+######################################
 # PARSING INPUT
 # ####################################
 
 # SET THE DEFAULT START AND END DATES
 date = datetime.datetime.today()
-startDate = (date + datetime.timedelta(days=-30))
+startDate = (date + datetime.timedelta(days=(0-config['Global']['default_days_back'])))
 endDate = (date + datetime.timedelta(days=1))
 
 if args.startdatestring is not None:
@@ -65,37 +73,27 @@ if args.enddatestring is not None:
 if flagVerbose:
     logger.info("Ending date: {0}".format(endDate))
 
-######################################
-# GET THE PARAMETERS FROM THE CONFIG FILE
-# ####################################
-config = configparser.ConfigParser()
-config.read('etc/unicenta2moneybird.conf')
 
 ######################################
 # DOWNLOAD ALL REQUIRED DATA
 # ####################################
-# uc.DownloadTickets()
-# uc.DownloadTicketLines()
-# uc.DownloadReceipts()
-# uc.DownloadPayments()
-# uc.DownloadTaxes()
+uc.DownloadTickets()
+uc.DownloadTicketLines()
+uc.DownloadReceipts()
+uc.DownloadPayments()
+uc.DownloadTaxes()
 
-# mb.DownloadContacts()
-# mb.DownloadFinancialAccounts()
-# mb.DownloadLedgerAccounts()
-# mb.DownloadTaxRates()
-# mb.DownloadFinanancialMutations(startDate, endDate)
-# mb.DownloadSalesInvoices(startDate, endDate)
-# mb.DownloadPurchaseInvoices(startDate, endDate)
-
+mb.DownloadContacts()
+mb.DownloadFinancialAccounts()
+mb.DownloadLedgerAccounts()
+mb.DownloadTaxRates()
+mb.DownloadFinanancialMutations(startDate, endDate)
+mb.DownloadSalesInvoices(startDate, endDate)
+mb.DownloadPurchaseInvoices(startDate, endDate)
 
 ######################################
 # PROCESS SALES (uc receipts)
 # ####################################
-#
-# # Compare the iZettle purchases with the Moneybird purchases
-# logger.info("Processing the iZettle purchases")
-#
 
 uc.TransformSales(startDate, endDate)
 
@@ -103,6 +101,7 @@ sales = uc.GetTransformedSales()
 
 # print(json.dumps(sales, sort_keys=True, indent=2, default=uc.json_serial))
 
+flagMadeChanges = False
 for sale in sales:
     flagFound = False
     # vergelijk met de Moneybird facturen
@@ -116,7 +115,9 @@ for sale in sales:
             logger.info("NOOP: Sales invoice with reference '{0}' should be added, but read-only mode is preventing "
                         "updates".format(sale['reference']))
         else:
-            date = sale['date']
+            date = datetime.datetime.strptime(sale['date'], "%Y-%m-%dT%H:%M:%S")
+            print(date)
+            print("-------")
             ucProducts = sale['products']
             details_attributes = []
             for ucProduct in ucProducts:
@@ -124,7 +125,7 @@ for sale in sales:
                             "description": ucProduct['description'],
                             "price": ucProduct['priceexcl'] * (1 + ucProduct['taxrate']),
                             "amount": ucProduct['quantity'],
-                            "tax_rate": ucProduct['taxrate']
+                            "tax_rate": ucProduct['taxrate']*100
                             }
                 details_attributes.append(products)
             new_id = mb.AddSalesInvoice(sale['reference'], date, details_attributes)
@@ -140,162 +141,70 @@ if flagMadeChanges:
     logger.info("Made changes, so re-downloading the Moneybird purchases")
     mb.DownloadPurchaseInvoices(startDate, endDate)
 
-# ######################################
-# # PROCESS IZETTLE TRANSACTIONS
-# ######################################
-#
-# # We will first walk through all transactions and set up the purchase invoices and financial statements (so we can link
-# # them later in another step
-#
-# flagPurchaseInvoicesChanged = False
-# flagFinancialStatementsChanged = False
-#
-# for izTransaction in iz.GetTransactions():
-#
-#     transactioncode = izTransaction['originatorTransactionType']
-#     trans_orig_uuid = izTransaction['originatingTransactionUuid']
-#     fmreference = "IZETTLE_{0}_{1}_{2}".format(transactioncode, izTransaction['timestamp'], trans_orig_uuid)
-#
-#     if transactioncode not in ['CARD_PAYMENT', 'CARD_PAYMENT_FEE', 'PAYOUT']:
-#         logger.error("Transaction code {0} not handled!".format(transactioncode))
-#         exit(1)
-#
-#     amount_cents = int(izTransaction['amount'])
-#     # always get a positive number to work with
-#     if amount_cents < 0:
-#         amount_cents = 0 - amount_cents
-#     amount_dec = decimal.Decimal(amount_cents / 100.0)
-#
-#     timestamp = dateutil.parser.parse(izTransaction['timestamp'])
-#
-#     ##############################
-#     # Check the financial statements
-#     ##############################
-#     flagFinancialMutationFound = False
-#     for mbFinancialMutation in mb.GetFinancialMutations():
-#         if mbFinancialMutation['message'] == fmreference:
-#             flagFinancialMutationFound = True
-#
-#     if not flagFinancialMutationFound:
-#         if flagNoop:
-#             logger.info("NOOP: should create financial statement {0}, but in read-only mode.".format(fmreference))
-#         else:
-#             mb.AddFinancialStatementAndMutation(fmreference, transactioncode, timestamp, amount_dec)
-#             logger.info("Created financial statement ({0}".format(fmreference))
-#             flagFinancialStatementsChanged = True
-#
-#     if flagFinancialMutationFound:
-#         logger.debug("Financial statement already exists ({0})".format(fmreference))
-#
-#     ##############################
-#     # Create purchase invoices
-#     ##############################
-#     if transactioncode == 'CARD_PAYMENT_FEE':
-#
-#         # ###############################################
-#         # check if we have a purchase invoice
-#         purchasereference = "Izettle inkoop {0}".format(trans_orig_uuid)
-#
-#         flagPurchaseInvoiceFound = False
-#         for mbPurchaseinvoice in mb.GetPurchaseInvoices():
-#             if mbPurchaseinvoice['reference'] == purchasereference:
-#                 flagPurchaseInvoiceFound = True
-#
-#         if not flagPurchaseInvoiceFound:
-#             if flagNoop:
-#                 logger.info("Noop: should create purchase invoice {0}, but in read-only mode".format(fmreference))
-#             else:
-#                 mb.AddPurchaseInvoice(purchasereference, timestamp, amount_dec)
-#                 logger.info("Created purchase invoice ({0}".format(fmreference))
-#                 flagPurchaseInvoicesChanged = True
-#
-#         if flagPurchaseInvoiceFound:
-#             logger.debug("Purchase invoice already exists ({0})".format(purchasereference))
-#
-# if flagPurchaseInvoicesChanged:
-#     logging.info("Purchase invoices were changed, re-downloading")
-#     mb.DownloadPurchaseInvoices(startDate, endDate)
-#
-# if flagFinancialStatementsChanged:
-#     logging.info("Financial mutations were changed, re-downloading")
-#     mb.DownloadFinanancialMutations(startDate, endDate)
-#
-#
-# ######################################
-# # PROCESS LINKS
-# ######################################
-#
-# # Now we will start the cross-checks to see if stuff needs to be linked.
-#
-# for fm in mb.GetFinancialMutations():
-#     fmreference = str(fm['message'])
-#     if fmreference.startswith('IZETTLE_'):
-#         # this is one of our iZettle financial statements
-#         fm_payments = fm['payments']
-#         fm_ledger_account_bookings = fm['ledger_account_bookings']
-#
-#         trans_orig_uuid = str(fm['message']).split('_')[-1]
-#         amount = mb.MakePositive(decimal.Decimal(fm['amount']))
-#
-#         if fmreference.startswith('IZETTLE_CARD_PAYMENT_FEE_'):
-#             if len(fm_payments) == 0:
-#                 # these are no payments for this financial mutation, so we need to start linking!
-#                 # this is a purchase invoice. Find the purchase invoice to go with it.
-#                 flagPurchaseInvoiceFound = False
-#                 for pi in mb.GetPurchaseInvoices():
-#                     pireference = str(pi['reference'])
-#                     if pireference.startswith('Izettle inkoop '):
-#                         uuid = pireference.split(' ')[-1]
-#                         if uuid == trans_orig_uuid:
-#                             flagPurchaseInvoiceFound = True
-#                             if flagNoop:
-#                                 logging.info("NOOP: should create link for financial mutation {0}, but in read-only mode.".format(fmreference))
-#                             else:
-#                                 mb.LinkPurchaseInvoice(fm['id'], pi['id'], amount)
-#                                 logging.info("Created link for financial mutation {0}.".format(fmreference))
-#                 if not flagPurchaseInvoiceFound:
-#                     logging.info("Could not find a purchange invoice for financial statement {0}, ignoring.".format(fmreference))
-#
-#         if fmreference.startswith('IZETTLE_CARD_PAYMENT_'):
-#             if len(fm_payments) == 0:
-#                 # these are no payments for this financial mutation, so we need to start linking!
-#
-#                 # this is a sales invoice. Find the sales invoice to go with it.
-#                 flagSalesInvoiceFound = False
-#                 for si in mb.GetSalesInvoices():
-#                     sireference = str(si['reference'])
-#
-#                     if sireference.startswith('Izettle verkoop '):
-#                         try:
-#                             izSalesNumber = int(sireference.split(' ')[-1])
-#                         except ValueError:
-#                             logging.error("Could not parse a sales invoice with reference '{0}'. I am expecting 'Izettle verkoop <int>'. If you need to do a manual transaction, make sure it does not start with 'Izettle verkoop '".format(sireference))
-#                             exit(1)
-#                         izSalesPaymentUuid = iz.LookupSalesPaymentUuid(izSalesNumber)
-#                         if izSalesPaymentUuid == trans_orig_uuid:
-#                             flagSalesInvoiceFound = True
-#                             if flagNoop:
-#                                 logging.info(
-#                                     "NOOP: should create link for financial mutation {0}, but in read-only mode.".format(
-#                                         fmreference))
-#                             else:
-#                                 mb.LinkSalesInvoice(fm['id'], si['id'], amount)
-#                                 logging.info("Created link for financial mutation {0}.".format(fmreference))
-#                 if not flagSalesInvoiceFound:
-#                     logging.info("Could not find a sales invoice for financial statement {0}, ignoring.".format(
-#                         fmreference))
-#
-#         if fmreference.startswith('IZETTLE_PAYOUT_'):
-#             if len(fm_ledger_account_bookings) == 0:
-#                 # these are no links for this financial mutation, so we need to start linking!
-#
-#                 # this is a payout. Link it to the kruisposten ledger.
-#                 if flagNoop:
-#                     logging.info("NOOP: should create link for financial mutation {0}, but in read-only mode.".format(
-#                             fmreference))
-#                 else:
-#                     mb.LinkPayout(fm['id'], amount)
-#                     logging.info("Created link for financial mutation {0}.".format(fmreference))
-#
-#
-# logging.info("All done!")
+######################################
+# PROCESS PAYMENTS
+# ####################################
+
+flagFinancialStatementsChanged = False
+
+for sale in sales:
+    for payment in sale['payments']:
+        payment_reference = 'betaling van {0}'.format(sale['reference'])
+        payment_date = datetime.datetime.strptime(sale['date'], "%Y-%m-%dT%H:%M:%S")
+
+        flagFinancialMutationFound = False
+        for mbFinancialMutation in mb.GetFinancialMutations():
+            if mbFinancialMutation['message'] == payment_reference:
+                flagFinancialMutationFound = True
+
+        if not flagFinancialMutationFound:
+            if flagNoop:
+                logger.info("NOOP: should create financial statement {0}, but in read-only mode.".format(payment_reference))
+            else:
+                mb.AddFinancialStatementAndMutation(payment_reference, date, payment['amount'])
+                logger.info("Created financial statement ({0}".format(payment_reference))
+                flagFinancialStatementsChanged = True
+
+        if flagFinancialMutationFound:
+            logger.debug("Financial statement already exists ({0})".format(payment_reference))
+
+if flagFinancialStatementsChanged:
+    logger.info("Financial mutations were changed, re-downloading")
+    mb.DownloadFinanancialMutations(startDate, endDate)
+
+######################################
+# PROCESS LINKS
+######################################
+
+# Now we will start the cross-checks to see if stuff needs to be linked.
+
+for fm in mb.GetFinancialMutations():
+    fmreference = str(fm['message'])
+    if fmreference.startswith('betaling van POS verkoop'):
+        # this is one of our UC financial statements
+        fm_payments = fm['payments']
+        fm_ledger_account_bookings = fm['ledger_account_bookings']
+        fm_amount = decimal.Decimal(fm['amount'])
+
+        if len(fm_payments) == 0:
+            # these are no payments for this financial mutation, so we need to start linking!
+
+            # this is a sales invoice. Find the sales invoice to go with it.
+            flagSalesInvoiceFound = False
+            for si in mb.GetSalesInvoices():
+                sireference = str(si['reference'])
+
+                if sireference in fmreference:
+                    flagSalesInvoiceFound = True
+                    if flagNoop:
+                        logger.info(
+                            "NOOP: should create link for financial mutation {0}, but in read-only mode.".format(
+                                fmreference))
+                    else:
+                        mb.LinkSalesInvoice(fm['id'], si['id'], fm_amount)
+                        logger.info("Created link for financial mutation {0}.".format(fmreference))
+            if not flagSalesInvoiceFound:
+                logger.info("Could not find a sales invoice for financial statement {0}, ignoring.".format(
+                    fmreference))
+
+logger.info("All done!")

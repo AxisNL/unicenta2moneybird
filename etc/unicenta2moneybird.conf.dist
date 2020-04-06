@@ -1,0 +1,16 @@
+[Global]
+default_days_back = 10
+
+[Unicenta]
+Unicenta_MySQL_host = host or ip
+Unicenta_MySQL_user = username
+Unicenta_MySQL_pass = password
+Unicenta_MySQL_db = databasename
+Payment_method_filter = cash, cash_refund (comma seperated list, or remove option)
+
+[Moneybird]
+Token = 1234567890asdfghjkl1234567890 
+administratie_id = 1234567890 
+contact_passant = Passant 
+financial_account_unicenta_cash = Pos Kassa 
+grootboekrekening_omzet = Omzet 
