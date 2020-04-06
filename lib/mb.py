@@ -1,13 +1,10 @@
 import configparser
-import datetime
-import decimal
-import math
-import os
-import urllib
-import numpy
-import requests
 import json
 import logging
+import math
+import os
+import numpy
+import requests
 
 # default verbosity, will be overwritten by main class
 flagVerbose = False
@@ -57,14 +54,6 @@ def LookupFinancialAccountId(name):
             return financial_account['id']
     logging.error("Could not lookup financial account with name '{0}' (watch out, case sensitive!)".format(name))
     exit(1)
-
-
-def numericEqual(x, y, epsilon=1 * 10 ** (-8)):
-    """Return True if two values are close in numeric value
-        By default close is withing 1*10^-8 of each other
-        i.e. 0.00000001
-    """
-    return abs(x - y) <= epsilon
 
 
 def LookupTaxrateId(tax_rate_type, percentage):
@@ -367,7 +356,7 @@ def AddSalesInvoice(reference, invoice_date, products):
             description = "Diversen"
         price = product['price']
         taxrateid = LookupTaxrateIdSales(product['tax_rate'])
-        ladgeraccountid = LookupLedgerAccountId('Omzet')
+        ladgeraccountid = LookupLedgerAccountId(config['Moneybird']['grootboekrekening_omzet'])
         details_attribute = {
             "description": description,
             "price": "{0:f}".format(price),
@@ -385,6 +374,8 @@ def AddSalesInvoice(reference, invoice_date, products):
                        }
                   }
     url = "https://moneybird.com/api/v2/{0}/sales_invoices".format(administratie_id)
+    print(json.dumps(postObject, sort_keys=True, indent=2))
+    exit(1)
     invoicepost = MakePostRequest(url, postObject)
     invoiceid = invoicepost['id']
     return invoiceid
@@ -468,3 +459,11 @@ def MakePatchRequest(url, postObj):
     r = requests.patch(url, json=postObj, headers=headers)
     result = r.json()
     return result
+
+
+def numericEqual(x, y, epsilon=1 * 10 ** (-8)):
+    """Return True if two values are close in numeric value
+        By default close is withing 1*10^-8 of each other
+        i.e. 0.00000001
+    """
+    return abs(x - y) <= epsilon

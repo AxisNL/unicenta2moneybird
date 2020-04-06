@@ -1,13 +1,7 @@
 import configparser
-import decimal
-import json
-import os
 import sys
-import dateutil.parser
 import datetime
 import argparse
-import logging
-import logging.handlers
 from lib import uc, mb, log
 
 parser = argparse.ArgumentParser(description='Sync iZettle to your Moneybird account.')
@@ -48,7 +42,7 @@ if sys.version_info <= (3, 6, 0):
 
 # SET THE DEFAULT START AND END DATES
 date = datetime.datetime.today()
-startDate = (date + datetime.timedelta(days=-1))
+startDate = (date + datetime.timedelta(days=-30))
 endDate = (date + datetime.timedelta(days=1))
 
 if args.startdatestring is not None:
@@ -80,11 +74,11 @@ config.read('etc/unicenta2moneybird.conf')
 ######################################
 # DOWNLOAD ALL REQUIRED DATA
 # ####################################
-uc.DownloadTickets()
-uc.DownloadTicketLines()
-uc.DownloadReceipts()
-uc.DownloadPayments()
-uc.DownloadTaxes()
+# uc.DownloadTickets()
+# uc.DownloadTicketLines()
+# uc.DownloadReceipts()
+# uc.DownloadPayments()
+# uc.DownloadTaxes()
 
 # mb.DownloadContacts()
 # mb.DownloadFinancialAccounts()
@@ -96,62 +90,56 @@ uc.DownloadTaxes()
 
 
 ######################################
-# PROCESS SALES (iZettle purchases)
+# PROCESS SALES (uc receipts)
 # ####################################
 #
 # # Compare the iZettle purchases with the Moneybird purchases
 # logger.info("Processing the iZettle purchases")
 #
-# flagMadeChanges = False
-# for izPurchase in iz.GetPurchases():
-#
-#     globalPurchaseNumber = izPurchase['globalPurchaseNumber']
-#
-#     if len(izPurchase['payments']) == 0:
-#         logger.error("This purchase (globalPurchaseNumber {0}) has no payments, not supported".format(globalPurchaseNumber))
-#     if len(izPurchase['payments']) > 1:
-#         logger.error(
-#             "This purchase (globalPurchaseNumber {0}) has more than one payment, not supported".format(globalPurchaseNumber))
-#
-#     fmreference = "Izettle verkoop {0}".format(globalPurchaseNumber)
-#     logger.info("Processing iZettle purchase {0}".format(globalPurchaseNumber))
-#     flagFound = False
-#     # vergelijk met de Moneybird facturen
-#     for mbFactuur in mb.GetSalesInvoices():
-#         if mbFactuur['reference'] == fmreference:
-#             flagFound = True
-#
-#     if not flagFound:
-#         # Voeg de invoice toe
-#         if flagNoop:
-#             logger.info("NOOP: Sales invoice with reference '{0}' should be added, but read-only mode is preventing updates".format(fmreference))
-#         else:
-#             timestamp = dateutil.parser.parse(izPurchase['timestamp'])
-#             izProducts = izPurchase['products']
-#             details_attributes = []
-#             for izProduct in izProducts:
-#                 unitPriceCents = int(izProduct['unitPrice'])
-#                 quantity = int(izProduct['quantity'])
-#                 totalproductcents = unitPriceCents * quantity
-#                 totalproductamount = decimal.Decimal(totalproductcents / 100.0)
-#                 products = {"description": izProduct['name'],
-#                             "price": totalproductamount,
-#                             "tax_rate": izProduct['vatPercentage']
-#                             }
-#                 details_attributes.append(products)
-#             new_id = mb.AddSalesInvoice(fmreference, timestamp, details_attributes)
-#             logger.info("Created sales invoice ({0})".format(fmreference))
-#             if not new_id is None:
-#                 mb.SendInvoice(new_id)
-#             flagMadeChanges = True
-#
-#     if flagFound:
-#         logger.debug("Sales invoice already exists ({0})".format(fmreference))
-# # all done, now re-download the purchase invoices from moneybird
-# if flagMadeChanges:
-#     logger.info("Made changes, so re-downloading the Moneybird purchases")
-#     mb.DownloadPurchaseInvoices(startDate, endDate)
-#
+
+uc.TransformSales(startDate, endDate)
+
+sales = uc.GetTransformedSales()
+
+# print(json.dumps(sales, sort_keys=True, indent=2, default=uc.json_serial))
+
+for sale in sales:
+    flagFound = False
+    # vergelijk met de Moneybird facturen
+    for mbFactuur in mb.GetSalesInvoices():
+        if mbFactuur['reference'] == sale['reference']:
+            flagFound = True
+
+    if not flagFound:
+        # Voeg de invoice toe
+        if flagNoop:
+            logger.info("NOOP: Sales invoice with reference '{0}' should be added, but read-only mode is preventing "
+                        "updates".format(sale['reference']))
+        else:
+            date = sale['date']
+            ucProducts = sale['products']
+            details_attributes = []
+            for ucProduct in ucProducts:
+                products = {"id": ucProduct['number'],
+                            "description": ucProduct['description'],
+                            "price": ucProduct['priceexcl'] * (1 + ucProduct['taxrate']),
+                            "amount": ucProduct['quantity'],
+                            "tax_rate": ucProduct['taxrate']
+                            }
+                details_attributes.append(products)
+            new_id = mb.AddSalesInvoice(sale['reference'], date, details_attributes)
+            logger.info("Created sales invoice ({0})".format(sale['reference']))
+            if new_id is not None:
+                mb.SendInvoice(new_id)
+            flagMadeChanges = True
+
+    if flagFound:
+        logger.debug("Sales invoice already exists ({0})".format(sale['reference']))
+# all done, now re-download the purchase invoices from moneybird
+if flagMadeChanges:
+    logger.info("Made changes, so re-downloading the Moneybird purchases")
+    mb.DownloadPurchaseInvoices(startDate, endDate)
+
 # ######################################
 # # PROCESS IZETTLE TRANSACTIONS
 # ######################################
