@@ -24,6 +24,7 @@ _DBConnection = None
 
 
 def GetDBConnection():
+    global _DBConnection
     if _DBConnection is None:
         _DBConnection = mysql.connector.connect(
             host=Unicenta_MySQL_host,
@@ -49,7 +50,7 @@ def DownloadTicketLines():
     mycursor = GetDBConnection().cursor()
     mycursor.execute(mysql_query)
     result = mycursor.fetchall()
-    with open(ticketslinesfile, 'w') as outfile:
+    with open(ticketlinesfile, 'w') as outfile:
         json.dump(result, outfile, indent=4, sort_keys=True)
     logging.info('Downloaded uniCenta ticketlines ({0} items)'.format(len(result)))
 
@@ -176,4 +177,4 @@ def DownloadTicketLines():
 
 # this code will only be run if this script is run directly
 if __name__ == '__main__':
-    print(json.dumps(DownloadTicketsRaw(), indent=2, sort_keys=True))
+    print(json.dumps(DownloadTickets(), indent=2, sort_keys=True))
