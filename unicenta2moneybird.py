@@ -163,7 +163,7 @@ for sale in sales:
                 logger.info("NOOP: should create financial statement {0}, but in read-only mode.".format(payment_reference))
             else:
                 mb.AddFinancialStatementAndMutation(payment_reference, date, payment['amount'])
-                logger.info("Created financial statement ({0}".format(payment_reference))
+                logger.info("Created financial statement ({0})".format(payment_reference))
                 flagFinancialStatementsChanged = True
 
         if flagFinancialMutationFound:
