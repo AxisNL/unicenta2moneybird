@@ -286,13 +286,10 @@ def AddFinancialStatementAndMutation(reference, timestamp, amount_dec):
 
     url = "https://moneybird.com/api/v2/{0}/financial_statements.json".format(administratie_id)
 
-    if flagNoop:
-        logging.info("NOOP: Should create financial mutation '{0}', but in read-only mode.".format(reference))
-    else:
-        statementpost = MakePostRequest(url, statement)
-        financial_mutation_id = statementpost['financial_mutations'][0]['id']
-        logging.info("Created financial statement '{0}'".format(reference))
-        return financial_mutation_id
+    statementpost = MakePostRequest(url, statement)
+    financial_mutation_id = statementpost['financial_mutations'][0]['id']
+
+    return financial_mutation_id
 
 
 def LinkSalesInvoice(mutation_id, salesinvoice_id, amount_dec):
