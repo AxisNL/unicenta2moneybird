@@ -80,8 +80,10 @@ config.read('etc/unicenta2moneybird.conf')
 ######################################
 # DOWNLOAD ALL REQUIRED DATA
 # ####################################
-uc.DownloadTickets(startDate, endDate)
-#
+uc.DownloadTickets()
+uc.DownloadTicketLines()
+#uc.TransformTickets()
+
 # mb.DownloadContacts()
 # mb.DownloadFinancialAccounts()
 # mb.DownloadLedgerAccounts()
@@ -89,6 +91,7 @@ uc.DownloadTickets(startDate, endDate)
 # mb.DownloadFinanancialMutations(startDate, endDate)
 # mb.DownloadSalesInvoices(startDate, endDate)
 # mb.DownloadPurchaseInvoices(startDate, endDate)
+
 
 ######################################
 # PROCESS SALES (iZettle purchases)

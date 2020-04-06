@@ -9,7 +9,7 @@ def logger(flagVerbose):
 
     # Create handlers
     c_handler = logging.StreamHandler(sys.stdout)
-    f_handler = logging.FileHandler(os.path.join('log', 'izettle2moneybird.log'))
+    f_handler = logging.FileHandler(os.path.join('log', 'unicenta2moneybird.log'))
     if flagVerbose:
         c_handler.setLevel(logging.INFO)
     else:

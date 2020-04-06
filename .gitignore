@@ -1,2 +1,5 @@
 .idea/
-etc/unicenta2moneybird.conf
+/etc/unicenta2moneybird.conf
+/log/unicenta2moneybird.log
+/var/*.json
+/lib/__pycache__/

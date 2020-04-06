@@ -14,7 +14,7 @@ flagVerbose = False
 flagNoop = False
 
 config = configparser.ConfigParser()
-config.read('etc/izettle2moneybird.conf')
+config.read('etc/unicenta2moneybird.conf')
 
 tokenMoneyBird = config['Moneybird']['Token']
 administratie_id = config['Moneybird']['administratie_id']
